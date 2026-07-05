@@ -77,6 +77,59 @@ function StationRow({
   );
 }
 
+// Horizontal marquee — if the text is wider than its box, ease it left to reveal the end, pause, ease back.
+// A hidden natural-width copy measures the text; the visible one-line copy is sized to it and translated.
+function Marquee({text, style}: {text: string; style: object}) {
+  const x = useRef(new Animated.Value(0)).current;
+  const [boxW, setBoxW] = useState(0);
+  const [textW, setTextW] = useState(0);
+  const overflow = boxW > 0 && textW > boxW + 4 ? textW - boxW : 0;
+
+  useEffect(() => {
+    x.stopAnimation();
+    x.setValue(0);
+    if (overflow <= 0) return;
+    const dur = Math.max(1600, overflow * 45);
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1400),
+        Animated.timing(x, {toValue: -overflow, duration: dur, useNativeDriver: true}),
+        Animated.delay(1400),
+        Animated.timing(x, {toValue: 0, duration: dur, useNativeDriver: true}),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [overflow, x, text]);
+
+  return (
+    <View
+      style={styles.marqueeBox}
+      onLayout={e => setBoxW(e.nativeEvent.layout.width)}>
+      {/* hidden measurer — a wide container + onTextLayout reports the true single-line width (onLayout
+          would clip to the box). */}
+      <Text
+        numberOfLines={1}
+        style={[style, styles.marqueeMeasure]}
+        onTextLayout={e =>
+          setTextW(Math.ceil(e.nativeEvent.lines.length ? e.nativeEvent.lines[0].width : 0))
+        }>
+        {text}
+      </Text>
+      {/* visible scrolling copy — sized to the full text so it never wraps */}
+      <Animated.Text
+        numberOfLines={1}
+        style={[
+          style,
+          // eslint-disable-next-line react-native/no-inline-styles
+          {width: textW || undefined, transform: [{translateX: x}]},
+        ]}>
+        {text}
+      </Animated.Text>
+    </View>
+  );
+}
+
 function PlayerBar({
   station,
   loading,
@@ -119,9 +172,7 @@ function PlayerBar({
           {station.name}
         </Text>
         {!!station.nowPlaying && (
-          <Text style={styles.playerNow} numberOfLines={1}>
-            {station.nowPlaying}
-          </Text>
+          <Marquee text={station.nowPlaying} style={styles.playerNow} />
         )}
       </View>
       <TouchableOpacity
@@ -262,7 +313,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
-  rowActive: {backgroundColor: C.cardActive, borderColor: C.accent},
+  rowActive: {backgroundColor: C.cardActive},
   name: {color: C.text, fontSize: 17, fontWeight: '600'},
   sub: {color: C.muted, fontSize: 13, marginTop: 4},
   hostRow: {flexDirection: 'row', alignItems: 'center', marginTop: 4},
@@ -286,6 +337,8 @@ const styles = StyleSheet.create({
   playerMain: {flex: 1, marginRight: 12},
   playerName: {color: C.text, fontSize: 16, fontWeight: '600'},
   playerNow: {color: C.accent, fontSize: 13, marginTop: 3},
+  marqueeBox: {overflow: 'hidden', alignSelf: 'stretch'},
+  marqueeMeasure: {position: 'absolute', opacity: 0, left: 0, top: 0, width: 9999},
   playerRight: {
     width: 40,
     height: 40,
