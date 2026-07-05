@@ -1,0 +1,28 @@
+# node
+node_modules/
+npm-debug.log
+yarn-error.log
+# RN / metro
+.expo/
+dist/
+web-build/
+*.jsbundle
+.metro-health-check*
+# android
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+*.keystore
+!debug.keystore
+*.apk
+*.aab
+# ios (n/a but future)
+ios/Pods/
+# misc
+.env
+.DS_Store
+*.log
+logs/
+.idea/
+.vscode/
