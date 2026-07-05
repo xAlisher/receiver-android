@@ -11,14 +11,14 @@ shows), and plays their **`.onion` HLS** streams over **Tor** — no server, no 
 
 ## Status
 
-🧪 **Experiment — discover + verify WORK on a real phone.** Built autonomously in one session.
+🧪 **Discover + verify + LISTEN all work on a real phone.** Built autonomously in one session — a decentralized, identity-verified, Tor-hidden radio station playing on Android.
 
 | Piece | State |
 |-------|-------|
 | **Scaffold** (RN 0.86, TS, Hermes) | ✅ builds + runs on device (Galaxy S20 FE, Android 13) |
 | **Identity** (secp256k1 verify + PGP fingerprint) | ✅ interop-proven vs a **real** PSR announce (`backfield aftermath frighten`) |
 | **Discovery** (Waku cluster 2 → REST → phone) | ✅ **live PSR verified on the phone** over the real network |
-| **Playback** (Tor .onion HLS) | 🟡 native module built + reaches the onion server through Tor; blocked on MediaMTX's `cookieCheck` 302-loop (branch `feat/playback`) |
+| **Playback** (Tor .onion HLS) | ✅ **audio plays on device** — ExoPlayer → OkHttp SOCKS → Tor → onion HLS (`?cookieCheck=1` gate solved) |
 
 Architecture: **REST-bridge** discovery (a nwaku node peered into cluster 2, polled via `fetch`), embedded
 `.aar` as the future P2P upgrade. Playback = react-native-video + a Kotlin OkHttp-SOCKS plugin over Tor.
