@@ -3,8 +3,8 @@
 // then verify + tamper-check + fingerprint-determinism. Run: npx tsx src/identity/identity.test.ts
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { signedBytes, canonicalize } from "./canonical.js";
-import { verifyAnnounce, fingerprint, isSigned } from "./verify.js";
+import { signedBytes, canonicalize } from "./canonical";
+import { verifyAnnounce, fingerprint, isSigned } from "./verify";
 
 function bytesToHex(b: Uint8Array): string {
   return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");

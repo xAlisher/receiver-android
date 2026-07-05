@@ -6,8 +6,8 @@
 
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { signedBytes } from "./canonical.js";
-import { PGP_EVEN, PGP_ODD } from "./pgpWords.js";
+import { signedBytes } from "./canonical";
+import { PGP_EVEN, PGP_ODD } from "./pgpWords";
 
 function hexToBytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) throw new Error("odd hex length");
