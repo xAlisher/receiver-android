@@ -11,8 +11,29 @@ shows), and plays their **`.onion` HLS** streams over **Tor** — no server, no 
 
 ## Status
 
-🧪 **Experiment / early build.** See [`docs/PLAN.md`](docs/PLAN.md) for the architecture + epic plan and the
-[Issues](https://github.com/xAlisher/receiver-android/issues) for progress.
+🧪 **Experiment — discover + verify WORK on a real phone.** Built autonomously in one session.
+
+| Piece | State |
+|-------|-------|
+| **Scaffold** (RN 0.86, TS, Hermes) | ✅ builds + runs on device (Galaxy S20 FE, Android 13) |
+| **Identity** (secp256k1 verify + PGP fingerprint) | ✅ interop-proven vs a **real** PSR announce (`backfield aftermath frighten`) |
+| **Discovery** (Waku cluster 2 → REST → phone) | ✅ **live PSR verified on the phone** over the real network |
+| **Playback** (Tor .onion HLS) | 🟡 native module built + reaches the onion server through Tor; blocked on MediaMTX's `cookieCheck` 302-loop (branch `feat/playback`) |
+
+Architecture: **REST-bridge** discovery (a nwaku node peered into cluster 2, polled via `fetch`), embedded
+`.aar` as the future P2P upgrade. Playback = react-native-video + a Kotlin OkHttp-SOCKS plugin over Tor.
+See [`docs/PLAN.md`](docs/PLAN.md) + the [Issues](https://github.com/xAlisher/receiver-android/issues).
+
+## Run it
+
+```bash
+scripts/run-waku-node.sh                      # nwaku node → cluster 2, REST :8645
+adb reverse tcp:8645 tcp:8645                 # phone → node (dev, over USB)
+adb reverse tcp:9050 tcp:9050                 # phone → host tor (for onion playback)
+npx react-native run-android                  # build + install + launch (JDK 17)
+```
+The phone discovers live stations (e.g. Parallel Society Radio on Sneg), verifies their identity, and shows
+the same fingerprints as desktop.
 
 ## What it has to do
 

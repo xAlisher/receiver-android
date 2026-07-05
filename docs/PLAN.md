@@ -10,9 +10,9 @@ The whole shape hinges on three unknowns, each under active research:
 
 | Spike | Question | Options | Decision |
 |-------|----------|---------|----------|
-| **Waku transport** | How does an RN app receive the same Waku messages? | js-waku light node · go-waku `.aar` native module · nwaku REST bridge | _pending_ |
-| **Tor** | How to route `.onion` HLS through Tor on Android? | Embedded Arti / tor-android · Orbot SOCKS | _pending_ |
-| **Interop** | Exact cluster/shard/content-topic + announce + sig scheme | (from delivery upstream) | _pending_ |
+| **Waku transport** | How does an RN app receive the same Waku messages? | REST bridge (nwaku node + fetch) · embedded `.aar` (P2P) | ✅ **REST bridge** (js-waku isn't RN-compatible; go-waku sunset) |
+| **Tor** | How to route `.onion` HLS through Tor on Android? | embedded kmp-tor · host tor via adb reverse (dev) | ✅ **kmp-tor** (prod) / host-tor-over-adb (dev) |
+| **Interop** | Exact cluster/shard/content-topic + announce + sig scheme | — | ✅ cluster **2**, `/waku/2/rs/2/2`, `/radio-basecamp/1/directory/json`, secp256k1 (no RLN) |
 
 Crypto (secp256k1 verify) is settled-ish: `@noble/curves` in JS.
 
