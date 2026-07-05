@@ -162,6 +162,18 @@ JavaVM *jvm;
 static jobject jClassLoader;
 static jmethodID jLoadClass;
 
+// Event-callback hardening: the node invokes wk_callback from ≥3 native threads (FFI, watchdog, libp2p).
+// Cache a GLOBAL ref to the callback class + its method id (local refs / per-call lookups are unsafe /
+// wasteful across threads), and use a per-thread key so each native thread attaches to the JVM ONCE and
+// detaches on thread exit — never attach/detach per callback.
+static jclass gEventCbClass;
+static jmethodID gExecEventCb;
+static pthread_key_t gDetachKey;
+static void detach_current_thread(void *unused) {
+  (void)unused;
+  (*jvm)->DetachCurrentThread(jvm);
+}
+
 JNIEnv *getEnv() {
   JNIEnv *env;
   int status = (*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
@@ -193,6 +205,16 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *pjvm, void *reserved) {
   (*env)->DeleteLocalRef(env, jClassLoaderClass);
   (*env)->DeleteLocalRef(env, jClassRef);
   (*env)->DeleteLocalRef(env, jLibraryClass);
+
+  // Cache the event-callback class as a GLOBAL ref + its method id once, and set up the per-thread
+  // detach key. The node calls wk_callback from its own (non-JVM) worker thread, so these must not
+  // depend on any thread-local/local state.
+  jclass cbLocal = (*env)->FindClass(env, "com/receiverandroid/EventCallbackManager");
+  gEventCbClass = (*env)->NewGlobalRef(env, cbLocal);
+  gExecEventCb = (*env)->GetStaticMethodID(env, gEventCbClass, "execEventCallback",
+                                           "(JLjava/lang/String;)V");
+  (*env)->DeleteLocalRef(env, cbLocal);
+  pthread_key_create(&gDetachKey, detach_current_thread);
 
   return JNI_VERSION_1_6;
 }
@@ -325,27 +347,37 @@ jobject Java_com_receiverandroid_LogosMessagingModule_wakuRelayUnsubscribe(JNIEn
 }
 
 void wk_callback(int callerRet, const char *msg, size_t len, void *userData) {
+  (void)callerRet;
+  (void)len;
   cb_env *c = (cb_env *)userData;
+  if (c == NULL) {
+    return;
+  }
 
-  // TODO: might be too much overhead to attach/detach per call?
-  JNIEnv *env = c->env;
-  JNIEnv *attachedEnv = NULL;
-  assert((*jvm)->AttachCurrentThread(jvm, &attachedEnv, NULL) == JNI_OK && "could not attach to current thread");
+  // The node invokes this from its own worker thread, which is NOT attached to the JVM. Attach it
+  // (once — the pthread-key destructor detaches on thread exit). NOTE: the previous code did the
+  // attach *inside* an assert(), so a release/NDEBUG build stripped the call and left env NULL →
+  // SIGSEGV on the first JNI deref. Attach unconditionally.
+  JNIEnv *env = NULL;
+  jint st = (*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
+  if (st == JNI_EDETACHED) {
+    if ((*jvm)->AttachCurrentThread(jvm, &env, NULL) != JNI_OK || env == NULL) {
+      return;
+    }
+    pthread_setspecific(gDetachKey, (void *)1); // arm detach-on-thread-exit for this thread
+  } else if (st != JNI_OK || env == NULL) {
+    return;
+  }
 
-  jclass clazz = loadClass(attachedEnv, "com/receiverandroid/EventCallbackManager");
-
-  jmethodID methodID =
-      (*attachedEnv)
-          ->GetStaticMethodID(attachedEnv, clazz, "execEventCallback", "(JLjava/lang/String;)V");
-
-  jstring message = (*attachedEnv)->NewStringUTF(attachedEnv, msg);
-  (*attachedEnv)->CallStaticVoidMethod(attachedEnv, clazz, methodID, c->wakuPtr, message);
-
-  (*attachedEnv)->DeleteLocalRef(attachedEnv, clazz);
-
-  (*attachedEnv)->DeleteLocalRef(attachedEnv, message);
-
-  (*jvm)->DetachCurrentThread(jvm);
+  jstring message = (msg != NULL) ? (*env)->NewStringUTF(env, msg) : NULL;
+  (*env)->CallStaticVoidMethod(env, gEventCbClass, gExecEventCb, c->wakuPtr, message);
+  if ((*env)->ExceptionCheck(env)) {
+    (*env)->ExceptionClear(env);
+  }
+  if (message != NULL) {
+    (*env)->DeleteLocalRef(env, message);
+  }
+  // No DetachCurrentThread here — attach-once-per-thread; the pthread key detaches on thread exit.
 }
 
 void Java_com_receiverandroid_LogosMessagingModule_wakuSetEventCallback(JNIEnv *env, jobject thiz,

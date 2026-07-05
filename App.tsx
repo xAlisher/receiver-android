@@ -96,14 +96,21 @@ function App(): React.JSX.Element {
   });
   const [playing, setPlaying] = useState<string | null>(null);
 
+  // E8 ✅ Primary discovery is now the phone's OWN embedded Logos Messaging node (cluster-2 relay via the
+  // JNI bridge) — no REST bridge. Received directory announces → decode → verify → identity-first list.
   useEffect(() => {
-    const stop = startRestDiscovery(setAnnounces, setStatus);
-    return stop;
+    let stop = () => {};
+    import('./src/discovery/nativeLogosSource')
+      .then(m => {
+        stop = m.startNativeDiscovery(setAnnounces, setStatus);
+      })
+      .catch(e => {
+        console.log('[LM] load err', String(e));
+        // fall back to the REST bridge if the native node fails to load
+        stop = startRestDiscovery(setAnnounces, setStatus);
+      });
+    return () => stop();
   }, []);
-
-  // E8: the embedded node now create/start/subscribes successfully, but SIGSEGVs emitting a connection
-  // event — an upstream Nim broker-threadvar bug (W-frontier-15). Disabled until the node's patched;
-  // discovery stays on the REST bridge. Re-enable via startNativeDiscovery once liblogosdelivery is fixed.
 
   // live announces once they arrive; sample set as an offline fallback so the identity UI always shows
   const live = announces.length > 0;

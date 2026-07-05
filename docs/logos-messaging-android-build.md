@@ -197,7 +197,23 @@ subscription_manager.internalHandler → emitMessageReceivedEvent`. **A PSR anno
 received + validated + relayed by the phone's own node.** Relay-receive works — NO Filter needed (the
 "no subscribed peers found" log is a filter-server red herring); the directory signal is `onMessageReceived`.
 
-## 🚧 W-frontier-16 — crash forwarding the received message to JS (cross-thread listener).
+## 🏆🏆🏆 W10 — W-frontier-16 CRACKED: received messages reach JS, no crash.
+Root cause (via deep agent analysis, correcting the earlier threadvar guess): listen + emit are on the SAME
+FFI worker thread (the `{.ffi.}` macro runs the listener registration on the FFI thread); the crash was
+**invoking the JNI trampoline `ctx[].eventCallback` from that non-JVM-attached worker thread**. And the JNI's
+old `wk_callback` did `assert((*jvm)->AttachCurrentThread(...) == JNI_OK)` — the ndk-build has no `APP_OPTIM`
+→ **release/NDEBUG strips `assert()`**, so the attach call *vanished* and `env` stayed NULL → SIGSEGV on the
+first JNI deref. Fix (JNI hardening, `logos_messaging_ffi.c`): attach OUTSIDE any assert, attach-once-per-
+thread via a `pthread_key` detach-on-exit destructor, cache a GLOBAL ref to `EventCallbackManager` + the
+`execEventCallback` methodID in `JNI_OnLoad`, null-guard `msg`, clear exceptions. RESULT on device: app
+stays alive; JS logs `[LM] event {"eventType":"message_received","message":{"payload":[123,34,97,110,110,
+111,117,110,99,101,84,111,112,105,99...` = `{"announceTopic":"…` — **3 real PSR announces received by the
+phone's own node over cluster-2 relay and delivered to JS. Fully P2P, no REST bridge.** (Agent's Option B —
+buffer+poll — remains the more robust long-term design if re-entrancy/battery matter; the attach fix is the
+minimal correct one for receive-only.) Last mile: WakuMessage payload arrives as a UTF-8 byte array, so the
+JS decoder must bytes→string before JSON.parse.
+
+## 🚧 W-frontier-16 (superseded) — original crash forwarding the received message to JS (cross-thread listener).
 `brokers/event_broker.nim:442 notifyMessageReceivedEventListener` → `await callback(event)` SIGSEGVs. The
 message event is emitted **synchronously on the libp2p gossipsub thread** (`pubsubpeer.runHandleLoop`), but
 the listener closure + FFI callback were set up on the FFI/main thread → the closure env / JNI callback is
@@ -208,6 +224,19 @@ not the app. Fixes to try next: marshal event emission onto the FFI/main thread 
 pthread-key). Audit also flagged `ffi_thread_request.nim:50` `handleRes` has the SAME empty-cstring bug
 (latent). Full audit + upstream prep in `docs/upstream/`.
 
-## Status: ✅ First Logos Messaging `.so` + JNI/RN module; node **create/start/subscribe/connect/RECEIVE**
-all work on device (real cluster-2 message received). 🚧 Last crash = forwarding the message to JS across
-the libp2p thread (W-frontier-16, upstream threading). Receiver runs on REST + embedded tor.
+## ✅✅✅ DONE — the phone IS a Logos Messaging node. Full P2P receive, end to end.
+With the JNI attach hardening + the byte-array decoder, and the **REST bridge removed** (`adb reverse
+--remove tcp:8645`), the app shows **"Parallel Society Radio · ✓ signed · 1 live · verified over Waku
+cluster 2"** — discovered purely by the embedded node over cluster-2 relay, secp256k1-verified, now-playing
+live. First Logos Messaging receiver on mobile. Native discovery is now the PRIMARY source in App.tsx (REST
+is fallback-only). Full chain: `create_node(logos.dev preset) → set_event_callback → start → subscribe
+(content topic) → gossipsub relay receive → JNI (attached) → JS decode(byte[]) → verify → identity list`.
+
+### Fork patches that got here (all in `/extra/tmp/logos-delivery-build`, saved to `docs/upstream/`)
+1. `ffi/ffi_context.nim` — empty-event guard (nil-deref hardening; upstream review-gated).
+2. `library/.../node_api.nim` — connection-status listener no-op (optional now the attach is fixed).
+3. **App side — `logos_messaging_ffi.c` JNI hardening (the real fix):** attach the node's worker thread to
+   the JVM *outside* any `assert` (NDEBUG stripped it), attach-once-per-thread + pthread-key detach, cached
+   global class ref + methodID, null-guard + exception clear.
+Open follow-ups (non-blocking): agent's Option B buffer+poll for re-entrancy/battery robustness;
+`ffi_thread_request.nim:50` twin empty-cstring bug; re-enable connection-status now attach is fixed.

@@ -28,8 +28,7 @@ function log(...a: unknown[]) {
   console.log('[LM]', ...a);
 }
 
-function decodeAnnounce(payload: string): Announce | null {
-  // Try base64 → utf8 JSON, then raw JSON (the wire payload is UTF-8 JSON; the FFI may base64 it).
+function decodeAnnounce(payload: string | number[]): Announce | null {
   const tryParse = (s: string): Announce | null => {
     try {
       return JSON.parse(s) as Announce;
@@ -37,16 +36,23 @@ function decodeAnnounce(payload: string): Announce | null {
       return null;
     }
   };
+  // The message_received event delivers WakuMessage.payload as a UTF-8 byte array. Turn it into text.
+  if (Array.isArray(payload)) {
+    let txt = '';
+    for (let i = 0; i < payload.length; i++) txt += String.fromCharCode(payload[i] & 0xff);
+    try {
+      txt = decodeURIComponent(escape(txt)); // fix multi-byte UTF-8
+    } catch {
+      /* already ascii */
+    }
+    return tryParse(txt);
+  }
+  // Fallbacks for a string payload: raw JSON, then base64 → utf8 JSON.
   let a = tryParse(payload);
   if (a) return a;
   try {
     const bin = global.atob(payload);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const txt =
-      typeof (global as any).TextDecoder !== 'undefined'
-        ? new (global as any).TextDecoder('utf-8').decode(bytes)
-        : decodeURIComponent(escape(bin));
+    const txt = decodeURIComponent(escape(bin));
     a = tryParse(txt);
   } catch {
     /* not base64 */
