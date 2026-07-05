@@ -24,6 +24,8 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+    // Embed + start Tor on launch; its auto SOCKS port feeds the video plugin (E4 — standalone, no Orbot).
+    TorManager.start(this)
     // Route ExoPlayer HLS fetches through Tor SOCKS for .onion radio streams (E5).
     ReactNativeVideoManager.getInstance().registerPlugin(OnionOkHttpPlugin())
   }

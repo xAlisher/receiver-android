@@ -13,13 +13,16 @@ import okhttp3.OkHttpClient
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.ProxySelector
+import java.net.SocketAddress
+import java.net.URI
 import java.util.concurrent.TimeUnit
 
 /**
  * Routes ExoPlayer's HLS fetches (manifest + every segment) through a Tor SOCKS5 proxy so `.onion`
  * radio streams play. The load-bearing tricks:
- *  - SOCKS proxy at 127.0.0.1:<socksPort> (dev: the host's tor via `adb reverse tcp:9050 tcp:9050`;
- *    prod: an embedded tor's auto SOCKS port — see E4).
+ *  - SOCKS proxy at 127.0.0.1:<TorManager.socksPort> — the app's OWN embedded tor (E4). A ProxySelector
+ *    reads the port dynamically + waits for bootstrap, so no Orbot / host tor / adb reverse is needed.
  *  - A custom Dns that fabricates an InetAddress carrying the ORIGINAL `.onion` hostname instead of
  *    resolving it locally — so OkHttp hands the name to the SOCKS proxy and Tor resolves it at the exit
  *    (effectively socks5h / remote DNS). Without this, `.onion` lookups fail "unresolved host".
@@ -27,10 +30,26 @@ import java.util.concurrent.TimeUnit
  *    loop → no audio), matching the desktop receiver's onion fix.
  *  - Generous timeouts because Tor circuits are slow, especially the first segment.
  */
-class OnionOkHttpPlugin(private val socksPort: Int = 9050) : RNVExoplayerPlugin {
+class OnionOkHttpPlugin : RNVExoplayerPlugin {
+
+    // Reads the embedded tor's SOCKS port at connection time, waiting up to ~45s for bootstrap on the
+    // first play. ExoPlayer's loader runs on a background thread, so a bounded block here is fine.
+    private val torProxySelector = object : ProxySelector() {
+        override fun select(uri: URI?): MutableList<Proxy> {
+            var port = TorManager.socksPort
+            var waited = 0
+            while (port == 0 && waited < 45_000) {
+                Thread.sleep(200)
+                waited += 200
+                port = TorManager.socksPort
+            }
+            val p = if (port > 0) port else 9050 // fallback (e.g. host tor) if embed hasn't come up
+            return mutableListOf(Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", p)))
+        }
+        override fun connectFailed(uri: URI?, sa: SocketAddress?, e: java.io.IOException?) {}
+    }
 
     private val client: OkHttpClient by lazy {
-        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", socksPort))
         val onionDns = object : Dns {
             override fun lookup(hostname: String): List<InetAddress> =
                 if (hostname.endsWith(".onion")) {
@@ -57,7 +76,7 @@ class OnionOkHttpPlugin(private val socksPort: Int = 9050) : RNVExoplayerPlugin 
             }
         }
         OkHttpClient.Builder()
-            .proxy(proxy)
+            .proxySelector(torProxySelector)
             .dns(onionDns)
             .cookieJar(jar)
             .followRedirects(true)
