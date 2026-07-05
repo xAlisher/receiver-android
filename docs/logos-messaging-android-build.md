@@ -59,6 +59,16 @@ Every decision, win, and wall is logged below (fieldcraft `red-team-fork-tree`).
   Fix: after RLN is built, invoke `nimble libLogosDeliveryAndroid` directly with
   `CPU=arm64 ABIDIR=arm64-v8a ANDROID_TOOLCHAIN_DIR=… ANDROID_COMPILER=aarch64-linux-android30-clang`
   (compile line: `nim c --os:android -d:androidNDK -d:chronosEventEngine=epoll --passL:-lrln --passL:-llog …`).
+- **W-fail-6 — `nat_traversal` C libs linked as host x86_64 → `libminiupnpc.a is incompatible with
+  aarch64linux`.** `build-deps` builds miniupnpc/libnatpmp for the HOST; the android target's
+  `rebuild-nat-libs` saw them "up to date" and skipped, so the arm64 link pulled x86_64 `.a`s. → clean the
+  `.a`/`.o` first to force a rebuild.
+- **W-fail-7 — the forced rebuild fails: `rebuild-nat-libs-nimbledeps` bakes `-mssse3` from the HOST arch.**
+  `Nat.mk` sets `PORTABLE_NAT_MARCH := -mssse3` when `NAT_UNAME_M == x86_64` (the build host) — an x86 flag
+  the arm64 clang rejects → miniupnpc build `Error 2` → no `.a`. Cross-compile bug. → pass
+  **`NAT_UNAME_M=aarch64`** to the rebuild so `-mssse3` is dropped, with `CC=<aarch64-linux-android30-clang>`,
+  then re-link. *(The Makefile's android path never actually produces a working arm64 nat-lib on its own —
+  this is the core reason no one's shipped it on mobile.)*
 
 ## Reproduce (so far)
 ```bash
