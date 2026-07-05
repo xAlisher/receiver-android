@@ -20,6 +20,14 @@ import {SAMPLE_ANNOUNCES} from './src/discovery/sampleAnnounces';
 import {startRestDiscovery} from './src/discovery/restSource';
 import {Announce} from './src/identity/verify';
 
+// MediaMTX gates onion HLS: /index.m3u8 → 302 → /index.m3u8?cookieCheck=1 (200), and the master then
+// hands out session-scoped child URLs. Its Set-Cookie is `Secure`, so it can't ride the HTTP onion —
+// but the query param alone yields 200. Pre-supply it so ExoPlayer's first fetch skips the loop.
+function withCookieCheck(url: string): string {
+  if (!url || url.includes('cookieCheck=')) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'cookieCheck=1';
+}
+
 const C = {
   bg: '#0d0f12',
   card: '#161a20',
@@ -144,7 +152,7 @@ function App(): React.JSX.Element {
       {/* Audio playback — routed through Tor SOCKS by OnionOkHttpPlugin (E5). Hidden (audio only). */}
       {playingStation?.streamUrl ? (
         <Video
-          source={{uri: playingStation.streamUrl}}
+          source={{uri: withCookieCheck(playingStation.streamUrl)}}
           paused={false}
           playInBackground
           playWhenInactive
