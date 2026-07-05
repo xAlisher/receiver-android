@@ -14,10 +14,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Video from 'react-native-video';
 import {ingest, Station} from './src/discovery/ingest';
 import {SAMPLE_ANNOUNCES} from './src/discovery/sampleAnnounces';
 import {startRestDiscovery} from './src/discovery/restSource';
 import {Announce} from './src/identity/verify';
+
+// MediaMTX gates onion HLS: /index.m3u8 → 302 → /index.m3u8?cookieCheck=1 (200), and the master then
+// hands out session-scoped child URLs. Its Set-Cookie is `Secure`, so it can't ride the HTTP onion —
+// but the query param alone yields 200. Pre-supply it so ExoPlayer's first fetch skips the loop.
+function withCookieCheck(url: string): string {
+  if (!url || url.includes('cookieCheck=')) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'cookieCheck=1';
+}
 
 const C = {
   bg: '#0d0f12',
@@ -99,6 +108,7 @@ function App(): React.JSX.Element {
     [announces, live],
   );
   const verifiedCount = stations.filter(s => s.verified).length;
+  const playingStation = stations.find(s => (s.pubkey || s.name) === playing);
   const statusText = live
     ? `● ${stations.length} live · ${verifiedCount} verified`
     : status.connected
@@ -138,6 +148,21 @@ function App(): React.JSX.Element {
             : 'sample data (offline) · forgeries dropped · connecting to Waku…'}
         </Text>
       </ScrollView>
+
+      {/* Audio playback — routed through Tor SOCKS by OnionOkHttpPlugin (E5). Hidden (audio only). */}
+      {playingStation?.streamUrl ? (
+        <Video
+          source={{uri: withCookieCheck(playingStation.streamUrl)}}
+          paused={false}
+          playInBackground
+          playWhenInactive
+          // eslint-disable-next-line react-native/no-inline-styles
+          style={{width: 0, height: 0}}
+          onLoad={() => console.log('[RCV] video onLoad', playingStation.name)}
+          onBuffer={e => console.log('[RCV] video onBuffer', e.isBuffering)}
+          onError={e => console.log('[RCV] video onError', JSON.stringify(e))}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

@@ -11,12 +11,13 @@
     "test:identity": "tsx src/identity/identity.test.ts"
   },
   "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.0.0",
+    "@react-native/new-app-screen": "0.86.0",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "@react-native/new-app-screen": "0.86.0",
     "react-native-safe-area-context": "^5.5.2",
-    "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.0.0"
+    "react-native-video": "^6.19.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -36,8 +37,8 @@
     "jest": "^29.6.3",
     "prettier": "2.8.8",
     "react-test-renderer": "19.2.3",
-    "typescript": "^5.8.3",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">= 22.11.0"
