@@ -116,4 +116,10 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // E5: Tor SOCKS-proxied HLS via ExoPlayer's OkHttp DataSource (OnionOkHttpPlugin).
+    // media3 pinned to the version react-native-video uses (RNVideo_media3Version = 1.8.0).
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
+    implementation("androidx.media3:media3-datasource-okhttp:1.8.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

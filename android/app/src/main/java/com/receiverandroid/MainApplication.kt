@@ -6,6 +6,7 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.brentvatne.react.ReactNativeVideoManager
 
 class MainApplication : Application(), ReactApplication {
 
@@ -23,5 +24,7 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+    // Route ExoPlayer HLS fetches through Tor SOCKS for .onion radio streams (E5).
+    ReactNativeVideoManager.getInstance().registerPlugin(OnionOkHttpPlugin())
   }
 }
