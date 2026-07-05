@@ -6,6 +6,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
+#include <pthread.h>
+
+// Wire the node's chronicles output (which goes to stdout/stderr) into logcat so waku_new's config-parse
+// result is visible. Android drops app stdout by default; pipe it to __android_log (tag "logos-node").
+static int _logos_logpipe[2];
+static void *_logos_log_pump(void *arg) {
+  (void)arg;
+  char buf[2048];
+  ssize_t n;
+  while ((n = read(_logos_logpipe[0], buf, sizeof(buf) - 1)) > 0) {
+    if (n > 0 && buf[n - 1] == '\n') n--;
+    buf[n] = '\0';
+    __android_log_write(ANDROID_LOG_INFO, "logos-node", buf);
+  }
+  return NULL;
+}
+static void logos_redirect_stdio_to_logcat(void) {
+  setvbuf(stdout, 0, _IONBF, 0);
+  setvbuf(stderr, 0, _IONBF, 0);
+  if (pipe(_logos_logpipe) != 0) return;
+  dup2(_logos_logpipe[1], STDOUT_FILENO);
+  dup2(_logos_logpipe[1], STDERR_FILENO);
+  pthread_t t;
+  pthread_create(&t, NULL, _logos_log_pump, NULL);
+  pthread_detach(t);
+}
 
 #define APPNAME "waku-jni"
 #define LOGD(TAG) __android_log_print(ANDROID_LOG_DEBUG , APPNAME,TAG);
@@ -106,13 +133,15 @@ jobject to_jni_ptr(JNIEnv *env, cb_result *result, void *ptr) {
   jboolean error;
   jstring message;
   jlong wakuPtr;
-  if (result != NULL) {
-    error = result->error;
+  // Only treat it as failure when on_response reported an ACTUAL error. on_response also fires on
+  // success ("on_response-ok"), which must NOT discard the real node ctx returned by create_node.
+  if (result != NULL && result->error) {
+    error = true;
     message = (*env)->NewStringUTF(env, result->message);
     wakuPtr = -1;
   } else {
     error = false;
-    message = (*env)->NewStringUTF(env, "ok");
+    message = (*env)->NewStringUTF(env, result != NULL ? result->message : "ok");
     wakuPtr = (jlong)ptr;
   }
 
@@ -177,14 +206,18 @@ jclass loadClass(JNIEnv *env, const char *className) {
 }
 
 void Java_com_receiverandroid_LogosMessagingModule_wakuSetup(JNIEnv *env, jobject thiz) {
-  LOGD("log example for debugging purposes...")
+  logos_redirect_stdio_to_logcat();
+  LOGD("stdio redirected to logcat (tag: logos-node)")
 }
 
 jobject Java_com_receiverandroid_LogosMessagingModule_wakuNew(JNIEnv *env, jobject thiz,
                                            jstring configJson) {
   const char *config = (*env)->GetStringUTFChars(env, configJson, 0);
+  __android_log_print(ANDROID_LOG_INFO, "logos-node", "waku_new config: %s", config);
   cb_result *result = NULL;
-  void *wakuPtr = waku_new(config, on_response, (void *)&result);
+  void *wakuPtr = logosdelivery_create_node(config, on_response, (void *)&result);
+  __android_log_print(ANDROID_LOG_INFO, "logos-node", "waku_new returned ptr=%p err=%s",
+                      wakuPtr, result ? result->message : "(none)");
   jobject response = to_jni_ptr(env, result, wakuPtr);
   (*env)->ReleaseStringUTFChars(env, configJson, config);
   free_cb_result(result);
@@ -194,7 +227,7 @@ jobject Java_com_receiverandroid_LogosMessagingModule_wakuNew(JNIEnv *env, jobje
 jobject Java_com_receiverandroid_LogosMessagingModule_wakuStart(JNIEnv *env, jobject thiz,
                                              jlong wakuPtr) {
   cb_result *result = NULL;
-  waku_start((void *)wakuPtr, on_response, &result);
+  logosdelivery_start_node((void *)wakuPtr, on_response, &result);
   jobject response = to_jni_result(env, result);
   free_cb_result(result);
   return response;
@@ -271,7 +304,7 @@ jobject Java_com_receiverandroid_LogosMessagingModule_wakuRelaySubscribe(JNIEnv 
                                                       jstring pubsubTopic) {
   cb_result *result = NULL;
   const char *topic = (*env)->GetStringUTFChars(env, pubsubTopic, 0);
-  waku_relay_subscribe((void *)wakuPtr, on_response, (void *)&result, topic);
+  logosdelivery_subscribe((void *)wakuPtr, on_response, (void *)&result, topic);
   jobject response = to_jni_result(env, result);
   free_cb_result(result);
   (*env)->ReleaseStringUTFChars(env, pubsubTopic, topic);

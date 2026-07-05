@@ -133,8 +133,9 @@ class LogosMessagingModule(reactContext: ReactApplicationContext) : ReactContext
   fun new(config: ReadableMap, promise: Promise) {
     val configStr = stringifyReadableMap(config)
     val response = wakuNew(configStr)
-    if (response.error) {
-      promise.reject("waku_new", response.errorMessage)
+    if (response.error || response.ptr == 0L) {
+      // ptr==0 means waku_new returned nil (config rejected) — reject instead of segfaulting on the callback.
+      promise.reject("waku_new", if (response.error) response.errorMessage else "node creation returned null (config rejected)")
     } else {
       // With this we just indicate to waku_ffi that we have registered a
       // closure, for this wakuPtr. Later once a message is received the

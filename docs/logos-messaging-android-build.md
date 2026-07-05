@@ -158,6 +158,34 @@ so the `waku_new` failure reason is invisible from here. **To crack it (next ses
   4. Consider the higher-level `logosdelivery_create_node` + `logos.dev` preset (what the desktop uses) —
      add a JNI method for it instead of raw `waku_new`; the preset bakes the cluster-2 params.
 
-## Status: ✅ **First Logos Messaging `.so` for Android built; JNI bridge + RN module LOAD the node
-on-device.** 🚧 Live cluster-2 startup is the open frontier (native crash, above). The receiver app itself
-runs on REST discovery + embedded tor (native source disabled pending the fix).
+## Debugging the live startup (tombstone + chronicles wired)
+- **Tombstone** (no root): the DEBUG/`libsigchain` crash dump lands in the main logcat — `signal 11`,
+  `#03 logosdelivery_set_event_callback+328 ← #09 LogosMessagingModule.new`.
+- **Chronicles → logcat**: `log.redirect-stdio` is SELinux-blocked, so wired it in the JNI instead —
+  `logos_redirect_stdio_to_logcat()` in `wakuSetup` dup2's stdout/stderr into a pipe pumped to
+  `__android_log` (tag `logos-node`). Instantly surfaced the node's Nim tracebacks.
+- **Bug A — API mismatch.** JNI created the node with kernel `waku_new` but set the callback with the
+  higher-level `logosdelivery_set_event_callback` (the only variant that exists) → nil-deref. Fix: use
+  `logosdelivery_create_node` / `_start_node` / `_subscribe` (content-topic!) consistently.
+- **Bug B — `to_jni_ptr` discarded the real ctx.** `on_response` fires on SUCCESS too (`on_response-ok`),
+  and `to_jni_ptr` returned `wakuPtr=-1` whenever `result != NULL` → the module called
+  `set_event_callback(-1)`. Fix: only `-1` when `result->error`; else use the real returned ctx.
+- **Config**: the desktop's `{mode:"Core", preset:"logos.dev", relay:true, entryNodes:[…]}` (the preset
+  bakes cluster 2 / shards); subscribe by **content topic** `/radio-basecamp/1/directory/json`.
+
+## 🏆 W8 — node CREATE + START + SUBSCRIBE all succeed on device.
+`[LM] node ctx 527677636688` (real ptr) → `start null` → `subscribe /radio-basecamp/1/directory/json null`
+→ `connected:true`. Every FFI call works; the node begins dialing the cluster-2 peers.
+
+## 🚧 W-frontier-15 — node SIGSEGVs emitting a connection event (upstream threading bug).
+On first peer connect: `brokers/event_broker.nim:467` `emitEventConnectionStatusChangeValue` →
+`accessProcIdent()` reads a **nil broker** (a Nim `{.threadvar.}` not initialized on the thread that
+handles peer connections) → "Attempt to read from nil". This is *inside* liblogosdelivery, before any
+listener check — **a node-internal thread-local-init bug on the FFI path**, not an app bug. Almost
+certainly why no app has shipped Logos Messaging on mobile. Next: report upstream / patch the node's
+broker to init the threadvar per-thread (or route event emission onto the node's main thread), then
+rebuild the `.so`. The RN side (module + JNI + config + ingest) is ready and correct.
+
+## Status: ✅ First Logos Messaging `.so` for Android + JNI/RN module + node create/start/subscribe all
+work on-device. 🚧 Blocked on an upstream node threadvar bug in event emission (W-frontier-15). Receiver
+runs on REST + embedded tor (native source disabled behind the fix).

@@ -94,32 +94,22 @@ export function startNativeDiscovery(
     try {
       await LogosMessaging.setup();
       log('setup ok');
+      // Higher-level logosdelivery config — the "logos.dev" preset bakes cluster 2 / shard / network
+      // params; entryNodes are the bootstrap peers (same as the desktop receiver's createNode).
       const config = {
-        host: '0.0.0.0',
-        port: 60000,
-        // ephemeral node key (hex) — a fresh identity each run is fine for a receive-only light node
-        key: '1122334455667788990011223344556677889900112233445566778899000123',
-        clusterId: CLUSTER_ID,
-        shards: [SHARD],
+        mode: 'Core',
+        preset: 'logos.dev',
         relay: true,
-        discv5Discovery: false,
-        store: false,
+        entryNodes: BOOTSTRAP,
       };
       ctx = await LogosMessaging.new(config);
       log('node ctx', ctx);
       const started = await LogosMessaging.start(ctx);
       log('start', JSON.stringify(started));
-      // dial the bootstrap peers so we join the cluster-2 mesh
-      for (const peer of BOOTSTRAP) {
-        try {
-          const r = await LogosMessaging.connect(ctx, peer, 20000);
-          log('connect', peer.slice(0, 45), JSON.stringify(r));
-        } catch (e) {
-          log('connect fail', String(e));
-        }
-      }
-      const subRes = await LogosMessaging.relaySubscribe(ctx, PUBSUB_TOPIC);
-      log('relaySubscribe', PUBSUB_TOPIC, JSON.stringify(subRes));
+      // logosdelivery_subscribe takes the CONTENT topic directly (not the pubsub /waku/2/rs/2/2).
+      const subRes = await LogosMessaging.relaySubscribe(ctx, CONTENT_TOPIC);
+      log('subscribe', CONTENT_TOPIC, JSON.stringify(subRes));
+      void PUBSUB_TOPIC;
       onStatus({connected: true});
     } catch (e) {
       log('startup error', String(e));
