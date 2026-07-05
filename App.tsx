@@ -4,7 +4,7 @@
  * Discovery is currently the pre-signed sample set (E2 wires the live Waku/REST source);
  * playback (E5) is stubbed to a "now playing" state until the Tor + ExoPlayer modules land.
  */
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import {ingest, Station} from './src/discovery/ingest';
 import {SAMPLE_ANNOUNCES} from './src/discovery/sampleAnnounces';
+import {startRestDiscovery} from './src/discovery/restSource';
+import {Announce} from './src/identity/verify';
 
 const C = {
   bg: '#0d0f12',
@@ -79,9 +81,29 @@ function StationRow({
 }
 
 function App(): React.JSX.Element {
-  const stations = useMemo(() => ingest(SAMPLE_ANNOUNCES), []);
+  const [announces, setAnnounces] = useState<Announce[]>([]);
+  const [status, setStatus] = useState<{connected: boolean; error?: string}>({
+    connected: false,
+  });
   const [playing, setPlaying] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stop = startRestDiscovery(setAnnounces, setStatus);
+    return stop;
+  }, []);
+
+  // live announces once they arrive; sample set as an offline fallback so the identity UI always shows
+  const live = announces.length > 0;
+  const stations = useMemo(
+    () => ingest(live ? announces : SAMPLE_ANNOUNCES),
+    [announces, live],
+  );
   const verifiedCount = stations.filter(s => s.verified).length;
+  const statusText = live
+    ? `● ${stations.length} live · ${verifiedCount} verified`
+    : status.connected
+      ? '◌ connected — waiting for stations'
+      : `◌ connecting…${status.error ? ' (' + status.error + ')' : ''}`;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -92,8 +114,8 @@ function App(): React.JSX.Element {
 
         <View style={styles.statusRow}>
           <Text style={styles.dirLabel}>Directory: Public</Text>
-          <Text style={styles.discovering}>
-            ● {stations.length} live · {verifiedCount} verified
+          <Text style={[styles.discovering, !live && styles.discoveringOff]}>
+            {statusText}
           </Text>
         </View>
 
@@ -111,8 +133,9 @@ function App(): React.JSX.Element {
         ))}
 
         <Text style={styles.footer}>
-          {stations.length} stations shown · forgeries dropped · sample source
-          (E2 wires live Waku)
+          {live
+            ? `${stations.length} live · verified over Waku cluster 2 · forgeries dropped`
+            : 'sample data (offline) · forgeries dropped · connecting to Waku…'}
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -132,6 +155,7 @@ const styles = StyleSheet.create({
   },
   dirLabel: {color: C.text, fontSize: 15, fontWeight: '600'},
   discovering: {color: C.ok, fontSize: 13},
+  discoveringOff: {color: C.muted},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
