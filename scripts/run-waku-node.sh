@@ -11,7 +11,7 @@ PEERS=(
 )
 ARGS=""; for p in "${PEERS[@]}"; do ARGS="$ARGS --staticnode=$p"; done
 docker run -d --name radio-waku -p 8645:8645 wakuorg/nwaku:latest \
-  --cluster-id=2 --shard=2 --relay=true \
+  --cluster-id=2 --shard=2 --relay=true --store=true --store-message-db-url="sqlite:///store.db" --store-max-num-db-connections=4 \
   --rest=true --rest-address=0.0.0.0 --rest-port=8645 --rest-allow-origin="*" \
   --nat=any --log-level=INFO $ARGS
 echo "nwaku up — REST http://127.0.0.1:8645 · cluster 2 · shard 2 · topic /radio-basecamp/1/directory/json"
