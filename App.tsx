@@ -101,6 +101,11 @@ function App(): React.JSX.Element {
     return stop;
   }, []);
 
+  // E8: the embedded Logos Messaging node loads fine, but its live cluster-2 startup crashes in
+  // logosdelivery_set_event_callback (see docs/logos-messaging-android-build.md, W-frontier-14).
+  // Disabled until that native crash is cracked; discovery stays on the REST bridge for now.
+  // useEffect(() => { startNativeDiscovery(...) }, []);
+
   // live announces once they arrive; sample set as an offline fallback so the identity UI always shows
   const live = announces.length > 0;
   const stations = useMemo(

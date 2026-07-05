@@ -143,5 +143,21 @@ Adapted the repo's `examples/mobile` JNI+RN template into `com.receiverandroid` 
 The `com.receiverandroid.LogosMessaging` RN native module is registered + its three native libs
 (`libc++_shared` → `librln` → `liblogosdelivery` → `liblogos_messaging_jni`) load clean.
 
-## Status: ✅ **JNI bridge + RN module load on device.** Next: JS drives `setup → new(cluster-2 config) →
-start → relaySubscribe(/waku/2/rs/2/2)` and consumes `logosMessage` → ingest → phone is its own node.
+## 🚧 W-frontier-14 — live node startup crashes at `logosdelivery_set_event_callback+328`.
+JS drives `setup` (logs `waku-jni: log example…` ✓) → `new(config)`. ~9s later (waku_new spinning up
+threads) it SIGSEGVs inside `logosdelivery_set_event_callback`. Same offset regardless of config values, so
+it's not the config contents — `waku_new` returns without a usable ctx and `set_event_callback(ctx)`
+dereferences null/garbage. The node's own chronicles logs don't reach logcat (not wired to `__android_log`),
+so the `waku_new` failure reason is invisible from here. **To crack it (next session):**
+  1. Pull the **tombstone** (`adb pull /data/tombstones/…` or `logcat -b crash`) for the exact fault addr +
+     registers at `set_event_callback+328`.
+  2. Wire chronicles → android log (or `--log-level=DEBUG` / a stdout sink) so `waku_new`'s config-parse
+     result is visible.
+  3. Confirm the exact `waku_new` config schema the current lib expects (keys like `clusterId`/`shards`
+     vs `pubsubTopic`; `key` format; whether `set_event_callback` must run AFTER `start`, not before).
+  4. Consider the higher-level `logosdelivery_create_node` + `logos.dev` preset (what the desktop uses) —
+     add a JNI method for it instead of raw `waku_new`; the preset bakes the cluster-2 params.
+
+## Status: ✅ **First Logos Messaging `.so` for Android built; JNI bridge + RN module LOAD the node
+on-device.** 🚧 Live cluster-2 startup is the open frontier (native crash, above). The receiver app itself
+runs on REST discovery + embedded tor (native source disabled pending the fix).
