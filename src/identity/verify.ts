@@ -40,7 +40,9 @@ export function verifyAnnounce(a: Announce): boolean {
   if (pub.length !== 66 || sig.length !== 128) return false; // 33 + 64 bytes, lowercase hex
   try {
     const digest = sha256(signedBytes(a as Record<string, unknown>)); // SHA-256(canonical minus sig)
-    return secp256k1.verify(hexToBytes(sig), digest, hexToBytes(pub)); // low-S enforced (matches libsecp256k1)
+    // prehash:false → ECDSA verifies over `digest` directly, exactly like libsecp256k1's
+    // secp256k1_ecdsa_verify(sig, sha256(canon), pubkey). (Without it, noble would re-hash the digest.)
+    return secp256k1.verify(hexToBytes(sig), digest, hexToBytes(pub), { prehash: false });
   } catch {
     return false;
   }

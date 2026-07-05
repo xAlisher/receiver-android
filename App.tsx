@@ -1,45 +1,169 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
+ * Receiver (Android) — discover & verify decentralized Logos radio stations.
+ * MVP UI: ingest announces → verify secp256k1 identity → identity-first station list.
+ * Discovery is currently the pre-signed sample set (E2 wires the live Waku/REST source);
+ * playback (E5) is stubbed to a "now playing" state until the Tor + ExoPlayer modules land.
  */
-
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import React, {useMemo, useState} from 'react';
 import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {ingest, Station} from './src/discovery/ingest';
+import {SAMPLE_ANNOUNCES} from './src/discovery/sampleAnnounces';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+const C = {
+  bg: '#0d0f12',
+  card: '#161a20',
+  cardActive: '#1d2129',
+  text: '#f2f4f7',
+  muted: '#8a929e',
+  accent: '#e8833a', // now-playing / Tor
+  ok: '#3ecf8e', // verified
+  border: '#242a33',
+};
 
+function StationRow({
+  s,
+  playing,
+  onToggle,
+}: {
+  s: Station;
+  playing: boolean;
+  onToggle: () => void;
+}) {
+  const subtitle = s.nowPlaying
+    ? `Playing now: ${s.nowPlaying}`
+    : s.description || s.hostLine;
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
+    <View style={[styles.row, playing && styles.rowActive]}>
+      <View style={styles.rowMain}>
+        <View style={styles.nameLine}>
+          <Text style={styles.name} numberOfLines={1}>
+            {s.name}
+          </Text>
+          {s.verified ? (
+            <Text style={styles.badge}>
+              ✓ {s.keySource === 'keycard' ? 'Keycard' : 'signed'}
+            </Text>
+          ) : (
+            <Text style={styles.badgeAnon}>anonymous</Text>
+          )}
+        </View>
+        {!!subtitle && (
+          <Text
+            style={[styles.sub, s.nowPlaying ? styles.nowPlaying : null]}
+            numberOfLines={1}>
+            {subtitle}
+          </Text>
+        )}
+        <Text style={styles.host} numberOfLines={1}>
+          {s.hostLine}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.playBtn, playing && styles.stopBtn]}
+        onPress={onToggle}
+        activeOpacity={0.7}>
+        <Text style={[styles.playIcon, playing && styles.stopIcon]}>
+          {playing ? '■' : '▶'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
+function App(): React.JSX.Element {
+  const stations = useMemo(() => ingest(SAMPLE_ANNOUNCES), []);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const verifiedCount = stations.filter(s => s.verified).length;
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.title}>Receiver</Text>
+        <Text style={styles.tagline}>Discover &amp; listen — decentralized radio</Text>
+
+        <View style={styles.statusRow}>
+          <Text style={styles.dirLabel}>Directory: Public</Text>
+          <Text style={styles.discovering}>
+            ● {stations.length} live · {verifiedCount} verified
+          </Text>
+        </View>
+
+        {stations.map(s => (
+          <StationRow
+            key={s.pubkey || s.name}
+            s={s}
+            playing={playing === (s.pubkey || s.name)}
+            onToggle={() =>
+              setPlaying(p =>
+                p === (s.pubkey || s.name) ? null : s.pubkey || s.name,
+              )
+            }
+          />
+        ))}
+
+        <Text style={styles.footer}>
+          {stations.length} stations shown · forgeries dropped · sample source
+          (E2 wires live Waku)
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  screen: {flex: 1, backgroundColor: C.bg},
+  scroll: {padding: 20, paddingBottom: 40},
+  title: {color: C.text, fontSize: 34, fontWeight: '700', marginTop: 12},
+  tagline: {color: C.muted, fontSize: 14, marginTop: 2, marginBottom: 20},
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
   },
+  dirLabel: {color: C.text, fontSize: 15, fontWeight: '600'},
+  discovering: {color: C.ok, fontSize: 13},
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 16,
+    marginBottom: 12,
+  },
+  rowActive: {backgroundColor: C.cardActive, borderColor: C.accent},
+  rowMain: {flex: 1, marginRight: 12},
+  nameLine: {flexDirection: 'row', alignItems: 'center'},
+  name: {color: C.text, fontSize: 17, fontWeight: '600', flexShrink: 1},
+  badge: {color: C.ok, fontSize: 11, marginLeft: 8, fontWeight: '600'},
+  badgeAnon: {color: C.muted, fontSize: 11, marginLeft: 8},
+  sub: {color: C.muted, fontSize: 13, marginTop: 4},
+  nowPlaying: {color: C.accent},
+  host: {color: C.muted, fontSize: 12, marginTop: 3},
+  playBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: C.ok,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stopBtn: {borderColor: C.accent},
+  playIcon: {color: C.ok, fontSize: 16, marginLeft: 2},
+  stopIcon: {color: C.accent, marginLeft: 0},
+  footer: {color: C.muted, fontSize: 11, marginTop: 16, textAlign: 'center'},
 });
 
 export default App;

@@ -35,9 +35,9 @@ const base = {
   pubkey: pubHex,
 };
 // sign canonical(base) — no sig field yet
-const digest = sha256(signedBytes(base));
-const sig = secp256k1.sign(digest, sk); // compact by default in noble v2
-const sigHex = bytesToHex(sig.toCompactRawBytes ? sig.toCompactRawBytes() : (sig as unknown as Uint8Array));
+const digest = sha256(signedBytes(base)); // base already includes pubkey (inside the signed bytes)
+const sig = secp256k1.sign(digest, sk, { prehash: false }) as Uint8Array; // 64-byte compact over the digest
+const sigHex = bytesToHex(sig);
 const announce = { ...base, sig: sigHex };
 
 console.log("station identity round-trip:");
