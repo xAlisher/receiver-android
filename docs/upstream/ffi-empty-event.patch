@@ -1,0 +1,40 @@
+From: receiver-android (Basecamp) — embedding liblogosdelivery via FFI on Android
+Subject: [PATCH] ffi_context: guard empty/nil event payloads in callEventCallback
+
+`callEventCallback` passes `unsafeAddr event[0]` (and `unsafeAddr msg[0]` in the
+except branch) to the C `FFICallBack`. For an empty Nim string the seq/string
+data pointer is nil, so `event[0]` dereferences nil ->
+`SIGSEGV: Illegal storage access. (Attempt to read from nil?)`.
+
+This fires the first time the node emits an event that serializes to an empty
+string. Guard both call sites: pass `nil` (with len 0) instead of indexing an
+empty string.
+
+Applies to the released 0.1.x line (v0.1.3 / v0.1.4 / v0.1.5), where the
+template lives in `ffi/ffi_context.nim`. The line numbers below match v0.1.3
+(the revision pinned by logos-delivery). See the accompanying report for the
+master-branch status.
+
+diff --git a/ffi/ffi_context.nim b/ffi/ffi_context.nim
+--- a/ffi/ffi_context.nim
++++ b/ffi/ffi_context.nim
+@@ -36,7 +36,9 @@ template callEventCallback*(ctx: ptr FFIContext, eventName: string, body: untyped
+     try:
+       let event = body
+       cast[FFICallBack](ctx[].eventCallback)(
+-        RET_OK, unsafeAddr event[0], cast[csize_t](len(event)), ctx[].eventUserData
++        RET_OK,
++        (if len(event) > 0: unsafeAddr event[0] else: nil),
++        cast[csize_t](len(event)), ctx[].eventUserData
+       )
+     except Exception, CatchableError:
+       let msg =
+@@ -43,5 +43,7 @@ template callEventCallback*(ctx: ptr FFIContext, eventName: string, body: untyped
+         "Exception " & eventName & " when calling 'eventCallBack': " &
+         getCurrentExceptionMsg()
+       cast[FFICallBack](ctx[].eventCallback)(
+-        RET_ERR, unsafeAddr msg[0], cast[csize_t](len(msg)), ctx[].eventUserData
++        RET_ERR,
++        (if len(msg) > 0: unsafeAddr msg[0] else: nil),
++        cast[csize_t](len(msg)), ctx[].eventUserData
+       )

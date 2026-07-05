@@ -186,6 +186,28 @@ certainly why no app has shipped Logos Messaging on mobile. Next: report upstrea
 broker to init the threadvar per-thread (or route event emission onto the node's main thread), then
 rebuild the `.so`. The RN side (module + JNI + config + ingest) is ready and correct.
 
-## Status: ✅ First Logos Messaging `.so` for Android + JNI/RN module + node create/start/subscribe all
-work on-device. 🚧 Blocked on an upstream node threadvar bug in event emission (W-frontier-15). Receiver
-runs on REST + embedded tor (native source disabled behind the fix).
+## 🏆🏆 W9 — the embedded node JOINS cluster 2 and RECEIVES A REAL MESSAGE on device.
+Two fork patches to `/extra/tmp/logos-delivery-build` (saved in `docs/upstream/`):
+1. **ffi_context.nim empty-event guard** — `(if len(event)>0: unsafeAddr event[0] else: nil)` at both FFI
+   call sites (the nil-deref root; verified present in nim-ffi v0.1.3/4/5, fixed only on unreleased master).
+2. **node_api.nim connection-status listener → no-op** — cleared the first-connect crash.
+Result on device: `node ctx` real → `start` → `subscribe /radio-basecamp/1/directory/json` → then the
+node's own gossipsub loop fires: `pubsubpeer.runHandleLoop → gossipsub.validateAndRelay → waku_relay →
+subscription_manager.internalHandler → emitMessageReceivedEvent`. **A PSR announce on `/waku/2/rs/2/2` was
+received + validated + relayed by the phone's own node.** Relay-receive works — NO Filter needed (the
+"no subscribed peers found" log is a filter-server red herring); the directory signal is `onMessageReceived`.
+
+## 🚧 W-frontier-16 — crash forwarding the received message to JS (cross-thread listener).
+`brokers/event_broker.nim:442 notifyMessageReceivedEventListener` → `await callback(event)` SIGSEGVs. The
+message event is emitted **synchronously on the libp2p gossipsub thread** (`pubsubpeer.runHandleLoop`), but
+the listener closure + FFI callback were set up on the FFI/main thread → the closure env / JNI callback is
+invoked on a thread that isn't GC/JNI-prepared for it (audit P0: `wk_callback` is invoked from ≥3 native
+threads; the node emits receive-events off the libp2p thread). This is an **upstream node threading issue**,
+not the app. Fixes to try next: marshal event emission onto the FFI/main thread in the node; and harden
+`wk_callback` (GetJavaVM once, AttachCurrentThread + NewGlobalRef callback obj + cached methodID, detach via
+pthread-key). Audit also flagged `ffi_thread_request.nim:50` `handleRes` has the SAME empty-cstring bug
+(latent). Full audit + upstream prep in `docs/upstream/`.
+
+## Status: ✅ First Logos Messaging `.so` + JNI/RN module; node **create/start/subscribe/connect/RECEIVE**
+all work on device (real cluster-2 message received). 🚧 Last crash = forwarding the message to JS across
+the libp2p thread (W-frontier-16, upstream threading). Receiver runs on REST + embedded tor.

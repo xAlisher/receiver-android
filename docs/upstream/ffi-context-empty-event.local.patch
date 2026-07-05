@@ -1,0 +1,23 @@
+--- /extra/tmp/logos-delivery-build/nimbledeps/pkgs2/ffi-0.1.3-6f9d49375ea1dc71add55c72ac80a808f238e5b0/ffi/ffi_context.nim.orig	2026-07-06 00:17:49.261350646 +0200
++++ /extra/tmp/logos-delivery-build/nimbledeps/pkgs2/ffi-0.1.3-6f9d49375ea1dc71add55c72ac80a808f238e5b0/ffi/ffi_context.nim	2026-07-06 00:17:49.270092563 +0200
+@@ -36,14 +36,18 @@
+     try:
+       let event = body
+       cast[FFICallBack](ctx[].eventCallback)(
+-        RET_OK, unsafeAddr event[0], cast[csize_t](len(event)), ctx[].eventUserData
++        RET_OK,
++        (if len(event) > 0: unsafeAddr event[0] else: nil),
++        cast[csize_t](len(event)), ctx[].eventUserData
+       )
+     except Exception, CatchableError:
+       let msg =
+         "Exception " & eventName & " when calling 'eventCallBack': " &
+         getCurrentExceptionMsg()
+       cast[FFICallBack](ctx[].eventCallback)(
+-        RET_ERR, unsafeAddr msg[0], cast[csize_t](len(msg)), ctx[].eventUserData
++        RET_ERR,
++        (if len(msg) > 0: unsafeAddr msg[0] else: nil),
++        cast[csize_t](len(msg)), ctx[].eventUserData
+       )
+ 
+ proc sendRequestToFFIThread*(
