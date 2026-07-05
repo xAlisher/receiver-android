@@ -1,0 +1,16 @@
+{
+  "name": "receiver-android",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:identity": "tsx src/identity/identity.test.ts"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
