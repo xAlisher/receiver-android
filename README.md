@@ -18,7 +18,7 @@ shows), and plays their **`.onion` HLS** streams over **Tor** — no server, no 
 | **Scaffold** (RN 0.86, TS, Hermes) | ✅ builds + runs on device (Galaxy S20 FE, Android 13) |
 | **Identity** (secp256k1 verify + PGP fingerprint) | ✅ interop-proven vs a **real** PSR announce (`backfield aftermath frighten`) |
 | **Discovery** (Waku cluster 2 → REST → phone) | ✅ **live PSR verified on the phone** over the real network |
-| **Playback** (Tor .onion HLS) | ✅ **audio plays on device** — ExoPlayer → OkHttp SOCKS → Tor → onion HLS (`?cookieCheck=1` gate solved) |
+| **Playback** (Tor .onion HLS) | ✅ **audio plays on device via EMBEDDED tor** — kmp-tor bundled, no Orbot/host tor/adb-reverse; ExoPlayer → OkHttp SOCKS → Tor → onion HLS |
 
 Architecture: **REST-bridge** discovery (a nwaku node peered into cluster 2, polled via `fetch`), embedded
 `.aar` as the future P2P upgrade. Playback = react-native-video + a Kotlin OkHttp-SOCKS plugin over Tor.
@@ -28,8 +28,8 @@ See [`docs/PLAN.md`](docs/PLAN.md) + the [Issues](https://github.com/xAlisher/re
 
 ```bash
 scripts/run-waku-node.sh                      # nwaku node → cluster 2, REST :8645
-adb reverse tcp:8645 tcp:8645                 # phone → node (dev, over USB)
-adb reverse tcp:9050 tcp:9050                 # phone → host tor (for onion playback)
+adb reverse tcp:8645 tcp:8645                 # phone → node (dev, over USB; discovery only)
+# tor is embedded — no host-tor bridge needed
 npx react-native run-android                  # build + install + launch (JDK 17)
 ```
 The phone discovers live stations (e.g. Parallel Society Radio on Sneg), verifies their identity, and shows
