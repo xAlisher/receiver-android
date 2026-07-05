@@ -82,5 +82,33 @@ nix shell nixpkgs#nim nixpkgs#git nixpkgs#gnumake nixpkgs#gcc --command bash -c 
 '
 ```
 
-## Status: 🔨 in progress — `make deps` bootstrapped; next is the arm64 cross-compile (RLN + Nim).
-_(updated as walls are hit)_
+## 🏆 W6 — BUILT. `liblogosdelivery.so` for Android arm64.
+375k lines of Nim/Waku compiled clean (`SuccessX`, 31s), linked against the arm64 `librln.so` + nat-libs.
+`ELF 64-bit LSB, ARM aarch64`. Exports the real node API — `logosdelivery_create_node / _start_node /
+_subscribe / _send / _set_event_callback / _stop_node / _destroy`, plus `waku_new`, `waku_relay_*`,
+`waku_filter_subscribe`. **First-ever Logos Messaging build for Android.**
+- Stripped 139M → **28M** (`llvm-strip --strip-unneeded`), 55 FFI symbols retained.
+- Vendored: `android/app/src/main/jniLibs/arm64-v8a/{liblogosdelivery.so, librln.so}`.
+
+## Full reproduce (all walls cleared)
+```bash
+git clone --recurse-submodules --shallow-submodules https://github.com/logos-messaging/logos-delivery && cd logos-delivery
+export ANDROID_NDK_HOME=~/Android/Sdk/ndk/27.1.12297006
+export ANDROID_TOOLCHAIN_DIR=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+CLANG=$ANDROID_TOOLCHAIN_DIR/bin/aarch64-linux-android30-clang
+export TMPDIR=/extra/tmp PATH="$HOME/.cargo/bin:$PATH"      # rustup + aarch64-linux-android target
+OSSL=$(nix eval --raw nixpkgs#openssl.out)/lib
+nix shell nixpkgs#nim nixpkgs#git nixpkgs#gnumake nixpkgs#gcc nixpkgs#cmake nixpkgs#pkg-config nixpkgs#openssl --command bash -c "
+  export PATH=\$HOME/.nimble/bin:\$PATH LD_LIBRARY_PATH=$OSSL
+  export CPU=arm64 ABIDIR=arm64-v8a ANDROID_ARCH=aarch64-linux-android ANDROID_COMPILER=aarch64-linux-android30-clang ANDROID_TOOLCHAIN_DIR=$ANDROID_TOOLCHAIN_DIR
+  make deps                                                 # bootstraps nimble
+  make build-deps                                           # W-fail-4: needs LD_LIBRARY_PATH=openssl
+  make liblogosdelivery-android-arm64                       # builds librln.so + nat-libs (W-fail-5: stops here)
+  make rebuild-nat-libs-nimbledeps CC=$CLANG NAT_UNAME_M=aarch64   # W-fail-6/7: force arm64 nat-libs, drop -mssse3
+  nimble libLogosDeliveryAndroid                            # the actual .so compile+link
+"
+# → build/android/arm64-v8a/{liblogosdelivery.so, librln.so}; strip with llvm-strip.
+```
+
+## Status: ✅ **`.so` BUILT + vendored.** Next: JNI bridge (`waku_ffi.c` template) + RN native module +
+swap `restSource` for the native Waku event stream → phone is its own Logos Messaging node (no REST node).
