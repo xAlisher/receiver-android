@@ -110,5 +110,38 @@ nix shell nixpkgs#nim nixpkgs#git nixpkgs#gnumake nixpkgs#gcc nixpkgs#cmake nixp
 # → build/android/arm64-v8a/{liblogosdelivery.so, librln.so}; strip with llvm-strip.
 ```
 
-## Status: ✅ **`.so` BUILT + vendored.** Next: JNI bridge (`waku_ffi.c` template) + RN native module +
-swap `restSource` for the native Waku event stream → phone is its own Logos Messaging node (no REST node).
+## JNI bridge + RN module (E8, part 2) — walls
+
+Adapted the repo's `examples/mobile` JNI+RN template into `com.receiverandroid` (renamed WakuModule →
+**LogosMessaging**, event `wakuEvent` → `logosMessage`, kept internal `waku_*` FFI = the actual C symbols).
+
+- **W-fail-8 — reference `.c` is for an OLDER API.** `waku_relay_subscribe/unsubscribe/publish/connect` arg
+  order drifted: current `liblogosdelivery_kernel.h` is `(ctx, FFICallBack, userData, topic…)` but the
+  reference calls `(ctx, topic, cb, ud)`. → reorder all four calls (callback+userData right after ctx).
+- **W-fail-9 — `[CXX1400] More than one externalNativeBuild path`.** RN 0.86 New-Arch already owns the
+  app's CMake externalNativeBuild, so a second `ndkBuild` block is rejected. → build the JNI `.so`
+  out-of-band with `ndk-build` and drop `liblogos_messaging_jni.so` into `jniLibs/` (no gradle native cfg).
+- **W-fail-10 — Kotlin nullability.** RN 0.86's Kotlin is stricter than the reference's config;
+  `ReadableArray.getMap/getArray(i)` are nullable → add `!!` in `readableArrayToList`.
+- **W-fail-11 — `.so` not packaged (stale merge cache).** First build didn't merge `src/main/jniLibs`;
+  had to delete `merged_native_libs`/`stripped_native_libs` intermediates + recompile so all three `.so`
+  land in the APK (`liblogosdelivery` 28M + `librln` 6M + `liblogos_messaging_jni` 16K).
+- **W-fail-12 — `UnsatisfiedLinkError: cannot locate symbol __gxx_personality_v0`.** `liblogosdelivery.so`
+  uses C++ exceptions but the Nim link never added the C++ runtime — and Android resolves a `dlopen`'d
+  lib's symbols against its OWN `DT_NEEDED`, so loading `c++_shared` first in Java does NOT help. → patch
+  the `.so`: `patchelf --add-needed libc++_shared.so liblogosdelivery.so` + vendor `libc++_shared.so`.
+  *(Proper fix: add `--passL:-lc++_shared` to the nim android compile so it links the C++ STL directly.)*
+
+- **W-fail-13 — `patchelf --add-needed` corrupts the hash: `empty/missing DT_HASH/DT_GNU_HASH … new hash
+  type from the future`.** patchelf 0.15.2 rewrote the dynamic section and Android's linker rejected the
+  result. → don't patch; **rebuild** with `--passL:-lc++_shared` in the nim android link line
+  (`logos_delivery.nimble` buildMobileAndroid) so `liblogosdelivery.so` links libc++_shared natively with an
+  intact GNU_HASH.
+
+## 🏆 W7 — the Logos Messaging node LOADS on the phone.
+`nativeloader: Load .../liblogosdelivery.so … : ok` + `liblogos_messaging_jni.so … : ok`, app stays alive.
+The `com.receiverandroid.LogosMessaging` RN native module is registered + its three native libs
+(`libc++_shared` → `librln` → `liblogosdelivery` → `liblogos_messaging_jni`) load clean.
+
+## Status: ✅ **JNI bridge + RN module load on device.** Next: JS drives `setup → new(cluster-2 config) →
+start → relaySubscribe(/waku/2/rs/2/2)` and consumes `logosMessage` → ingest → phone is its own node.

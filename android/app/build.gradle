@@ -105,6 +105,9 @@ android {
             useLegacyPackaging = true
         }
     }
+    // E8: the Logos Messaging JNI bridge (liblogos_messaging_jni.so) is pre-built with ndk-build and
+    // dropped into jniLibs/ alongside liblogosdelivery.so + librln.so — see scripts/build-jni.sh.
+    // (Can't use externalNativeBuild here: RN's New-Arch CMake already claims it — CXX1400.)
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -140,4 +143,7 @@ dependencies {
     implementation("io.matthewnelson.kmp-tor:runtime:2.6.0")
     implementation("io.matthewnelson.kmp-tor:resource-exec-tor:408.22.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    // E8: Waku JNI module uses Gson for config/message JSON marshalling.
+    implementation("com.google.code.gson:gson:2.11.0")
 }
