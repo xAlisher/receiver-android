@@ -244,9 +244,8 @@ function App(): React.JSX.Element {
           playingStation ? styles.scrollWithPlayer : null,
         ]}>
         <Text style={styles.title}>Receiver</Text>
-        <Text style={styles.tagline}>Discover &amp; listen — decentralized radio</Text>
-        <Text style={styles.firstLine}>
-          🌐 First radio app running its own Logos Messaging node on mobile
+        <Text style={styles.tagline}>
+          Decentralised anonymous radio over Tor and Logos Messaging
         </Text>
 
         <View style={styles.statusRow}>
@@ -297,14 +296,7 @@ const styles = StyleSheet.create({
   scroll: {padding: 20, paddingBottom: 40},
   scrollWithPlayer: {paddingBottom: 130},
   title: {color: C.text, fontSize: 34, fontWeight: '700', marginTop: 12},
-  tagline: {color: C.muted, fontSize: 14, marginTop: 2},
-  firstLine: {
-    color: C.ok,
-    fontSize: 12,
-    marginTop: 8,
-    marginBottom: 20,
-    fontWeight: '600',
-  },
+  tagline: {color: C.muted, fontSize: 14, marginTop: 4, marginBottom: 20},
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
