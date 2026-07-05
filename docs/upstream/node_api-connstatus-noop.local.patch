@@ -1,0 +1,16 @@
+diff --git a/library/logos_delivery_api/node_api.nim b/library/logos_delivery_api/node_api.nim
+index cfee2f5e..3070368e 100644
+--- a/library/logos_delivery_api/node_api.nim
++++ b/library/logos_delivery_api/node_api.nim
+@@ -119,8 +119,9 @@ proc logosdelivery_start_node(
+   let ConnectionStatusChangeListener = EventConnectionStatusChange.listen(
+     ctx.myLib[].waku.brokerCtx,
+     proc(event: EventConnectionStatusChange) {.async: (raises: []).} =
+-      callEventCallback(ctx, "onConnectionStatusChange"):
+-        $newJsonEvent("connection_status_change", event),
++      # radio-android fork patch: connection-status forwarding crashes in the FFI callEventCallback on the
++      # health-monitor thread; the receiver only needs message events, so no-op this listener.
++      discard,
+   ).valueOr:
+     chronicles.error "ConnectionStatusChange.listen failed", err = $error
+     return err("ConnectionStatusChange.listen failed: " & $error)
