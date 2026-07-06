@@ -1,7 +1,7 @@
 # receiver-android — plan
 
 ## Mission
-Bring the Logos radio **listener** to Android: discover stations over the delivery/Waku layer, verify their
+Bring the Logos radio **listener** to Android: discover stations over the delivery/Logos Messaging layer, verify their
 secp256k1 identity, and play `.onion` HLS over Tor — as a React Native app. Interop with the existing
 desktop `receiver-basecamp` / `booth-basecamp` (same topics, same announce schema, same fingerprints).
 
@@ -10,7 +10,7 @@ The whole shape hinges on three unknowns, each under active research:
 
 | Spike | Question | Options | Decision |
 |-------|----------|---------|----------|
-| **Waku transport** | How does an RN app receive the same Waku messages? | REST bridge (nwaku node + fetch) · embedded `.aar` (P2P) | ✅ **REST bridge** (js-waku isn't RN-compatible; go-waku sunset) |
+| **Logos Messaging transport** | How does an RN app receive the same Logos Messaging messages? | REST bridge (nwaku node + fetch) · embedded `.aar` (P2P) | ✅ **REST bridge** (js-waku isn't RN-compatible; go-waku sunset) |
 | **Tor** | How to route `.onion` HLS through Tor on Android? | embedded kmp-tor · host tor via adb reverse (dev) | ✅ **kmp-tor** (prod) / host-tor-over-adb (dev) |
 | **Interop** | Exact cluster/shard/content-topic + announce + sig scheme | — | ✅ cluster **2**, `/waku/2/rs/2/2`, `/radio-basecamp/1/directory/json`, secp256k1 (no RLN) |
 
@@ -18,7 +18,7 @@ Crypto (secp256k1 verify) is settled-ish: `@noble/curves` in JS.
 
 ## Epics (GitHub issues to be filed once architecture lands)
 - **E1 — Scaffold**: RN app (TypeScript, Hermes), Android project, CI-less local build onto the device.
-- **E2 — Delivery/Waku transport**: receive announces from the directory topic (the chosen path).
+- **E2 — Delivery/Logos Messaging transport**: receive announces from the directory topic (the chosen path).
 - **E3 — Identity verification**: secp256k1 verify + 3-word PGP fingerprint (port `pgp_words` + canonical serialization).
 - **E4 — Tor**: local SOCKS5 for `.onion` (embedded tor or Orbot), bootstrap status UI.
 - **E5 — Playback**: `.onion` HLS through Tor via ExoPlayer/Media3, background audio, now-playing.
@@ -33,5 +33,5 @@ Crypto (secp256k1 verify) is settled-ish: `@noble/curves` in JS.
 
 ## Principles
 - **Interop-first**: a station broadcast from desktop `booth` must appear + verify + play on the phone.
-- **No server**: no custom backend; talk Waku + Tor directly (or via a public service node if unavoidable — flag it).
+- **No server**: no custom backend; talk Logos Messaging + Tor directly (or via a public service node if unavoidable — flag it).
 - **Ship thin**: prove the end-to-end path (discover → verify → play one station) before polishing.

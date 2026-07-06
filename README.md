@@ -1,53 +1,70 @@
-# receiver-android
+# Receiver (Android)
 
-**Listen to decentralized radio stations on your phone.** A React Native
-Android app that discovers stations broadcast over the Logos  messaging layer, verifies
-each station's **secp256k1 identity** (the same fingerprints the desktop [Receiver](https://github.com/xAlisher/receiver-basecamp)
-shows), and plays their **`.onion` HLS** streams over **Tor** — no server, no account, no app store gatekeeper.
+**Decentralised, anonymous radio — on your phone.** Receiver discovers live radio stations over
+**Logos Messaging** (a peer-to-peer messaging network) and plays them through **Tor**, so the station's
+location and yours both stay private. Every station is cryptographically signed; forgeries are dropped.
 
-> Sibling of [`receiver-basecamp`](https://github.com/xAlisher/receiver-basecamp) (desktop, Qt/QML) and
-> [`booth-basecamp`](https://github.com/xAlisher/booth-basecamp) (the broadcaster). This brings the
-> *listener* to mobile.
+<p align="center">
+  <img src="docs/screenshots/receiver.png" width="300" alt="Receiver — Parallel Society Radio, verified, over Tor and Logos Messaging">
+</p>
 
-## Status
+> The phone runs **its own Logos Messaging node** — it joins the network and receives the station directory
+> peer-to-peer. No server, no bridge, no account.
 
-🧪 **Discover + verify + LISTEN all work on a real phone.** Built autonomously in one session — a decentralized, identity-verified, Tor-hidden radio station playing on Android.
+## What it does
 
-| Piece | State |
-|-------|-------|
-| **Scaffold** (RN 0.86, TS, Hermes) | ✅ builds + runs on device (Galaxy S20 FE, Android 13) |
-| **Identity** (secp256k1 verify + PGP fingerprint) | ✅ interop-proven vs a **real** PSR announce (`backfield aftermath frighten`) |
-| **Discovery** (Waku cluster 2 → REST → phone) | ✅ **live PSR verified on the phone** over the real network |
-| **Playback** (Tor .onion HLS) | ✅ **audio plays on device via EMBEDDED tor** — kmp-tor bundled, no Orbot/host tor/adb-reverse; ExoPlayer → OkHttp SOCKS → Tor → onion HLS |
+- 📡 **Discovers stations** by running an embedded **Logos Messaging** node on the phone (cluster 2, relay) and receiving signed station announces straight from the network.
+- 🔑 **Verifies identity** — each announce is signed with secp256k1; the app verifies it on-device and **drops forgeries**. Verified stations carry a PGP-word fingerprint.
+- 🧅 **Plays over Tor** — station audio (HLS) streams through an embedded Tor client via `.onion`, hiding your IP and the station's.
+- ▶️ **Tap to listen** — a station opens a bottom player that loads over Tor (breathing indicator), then plays.
 
-Architecture: **REST-bridge** discovery (a nwaku node peered into cluster 2, polled via `fetch`), embedded
-`.aar` as the future P2P upgrade. Playback = react-native-video + a Kotlin OkHttp-SOCKS plugin over Tor.
-See [`docs/PLAN.md`](docs/PLAN.md) + the [Issues](https://github.com/xAlisher/receiver-android/issues).
+## How it works
 
-## Run it
+Receiver embeds `liblogosdelivery` — the Logos Messaging node (a Nim library) — through a JNI bridge, joins
+Logos Messaging **cluster 2** over relay, and subscribes to the station directory topic. Incoming announces
+are decoded, their secp256k1 signatures verified on-device, and verified stations listed. Playback routes
+the station's onion HLS through **Tor** (kmp-tor) via an OkHttp data source.
+
+```
+Logos Messaging node (cluster 2, relay) ─▶ directory announces ─▶ verify secp256k1 ─▶ station list
+                                                                                          │ tap
+                                                       onion HLS  ◀──  Tor  ◀─────────────┘ play
+```
+
+## Install
+
+Grab the signed APK from [**Releases**](../../releases) and sideload:
 
 ```bash
-scripts/run-waku-node.sh                      # nwaku node → cluster 2, REST :8645
-adb reverse tcp:8645 tcp:8645                 # phone → node (dev, over USB; discovery only)
-# tor is embedded — no host-tor bridge needed
-npx react-native run-android                  # build + install + launch (JDK 17)
+adb install receiver-android-v1.0.apk
 ```
-The phone discovers live stations (e.g. Parallel Society Radio on Sneg), verifies their identity, and shows
-the same fingerprints as desktop.
 
-## What it has to do
-
-1. **Discover** — subscribe to the Logos delivery directory topic over Waku and receive live station announces.
-2. **Verify** — check each announce's secp256k1 signature; show the 3-word PGP fingerprint (`newborn vocalist uncut`).
-3. **Play** — stream a station's `.onion` HLS over Tor (ExoPlayer/Media3 through a local Tor SOCKS proxy).
-4. **Feel native** — station list, now-playing, background audio, the same identity-first UX as desktop.
-
-## The hard parts (being researched)
-
-- **Waku on RN** — js-waku light node vs go-waku native binding vs a service-node REST bridge.
-- **Tor on Android** — embedded tor (Arti / tor-android) vs Orbot, exposing a local SOCKS5 for `.onion` HLS.
-- **Interop** — matching the delivery layer's cluster/shard/content-topic + announce schema exactly.
+- **arm64-v8a**, Android 13+. Debug-signed → sideload only (not Play Store).
 
 ## Build
 
-_TBD once the stack is chosen (see PLAN.md). Target: `npx react-native run-android` onto a connected device._
+```bash
+npm install
+npx react-native run-android              # debug (Metro)
+cd android && ./gradlew assembleRelease   # standalone release APK
+```
+
+The Logos Messaging node (`liblogosdelivery.so`) is prebuilt and vendored in
+`android/app/src/main/jniLibs/arm64-v8a/`. To rebuild it from source — and for the full build story (the
+first Logos Messaging node compiled for Android) — see
+[`docs/logos-messaging-android-build.md`](docs/logos-messaging-android-build.md).
+
+## Status
+
+Discovery, identity verification, and Tor playback all work on-device — the phone receives real station
+announces peer-to-peer and plays them over Tor with no external node. Open items are tracked in
+[Issues](../../issues).
+
+## Companion
+
+[**Booth**](https://github.com/xAlisher/booth-android) — the broadcasting side: create a station and go on
+air from your phone (mic → HLS → Tor onion → signed announce).
+
+---
+
+Part of the [Logos](https://logos.co/) ecosystem.
