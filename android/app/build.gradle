@@ -118,6 +118,8 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Cleartext (onion-over-Tor / REST / LAN) is permitted via res/xml/network_security_config.xml,
+            // which takes precedence over the RN plugin's release usesCleartextTraffic=false.
         }
     }
 }

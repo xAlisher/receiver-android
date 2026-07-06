@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Onion HLS is HTTP-over-Tor, and the REST/LAN fallbacks are plaintext, so cleartext must be permitted.
+     A network security config takes precedence over android:usesCleartextTraffic, which the React Native
+     gradle plugin forces to "false" on release builds (that blocked .onion playback: "CLEARTEXT
+     communication to …onion not permitted by network security policy"). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
