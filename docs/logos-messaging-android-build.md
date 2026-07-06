@@ -2,7 +2,7 @@
 
 Goal: build `liblogosdelivery.so` (Logos Messaging = the `logos-messaging/logos-delivery` Nim library,
 the rebranded nwaku "new Waku") for **Android arm64-v8a**, embed it in the receiver-android RN app via JNI,
-and run an **in-app Waku light node** on **cluster 2** — no external nwaku node. *No known app runs Logos
+and run an **in-app Logos Messaging light node** on **cluster 2** — no external nwaku node. *No known app runs Logos
 Messaging on mobile yet; this would be the first.*
 
 Every decision, win, and wall is logged below (fieldcraft `red-team-fork-tree`). Timestamps 2026-07-05.
