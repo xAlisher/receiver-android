@@ -68,3 +68,7 @@ air from your phone (mic → HLS → Tor onion → signed announce).
 ---
 
 Part of the [Logos](https://logos.co/) ecosystem.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
