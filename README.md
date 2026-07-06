@@ -1,6 +1,6 @@
 # receiver-android
 
-**Listen to decentralized [Logos](https://github.com/logos-co) radio on your phone.** A React Native
+**Listen to decentralized radio stations on your phone.** A React Native
 Android app that discovers stations broadcast over the Logos **delivery / Waku** messaging layer, verifies
 each station's **secp256k1 identity** (the same fingerprints the desktop [Receiver](https://github.com/xAlisher/receiver-basecamp)
 shows), and plays their **`.onion` HLS** streams over **Tor** — no server, no account, no app store gatekeeper.
