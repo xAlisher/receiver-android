@@ -83,7 +83,7 @@ nix shell nixpkgs#nim nixpkgs#git nixpkgs#gnumake nixpkgs#gcc --command bash -c 
 ```
 
 ## 🏆 W6 — BUILT. `liblogosdelivery.so` for Android arm64.
-375k lines of Nim/Waku compiled clean (`SuccessX`, 31s), linked against the arm64 `librln.so` + nat-libs.
+375k lines of Nim compiled clean (`SuccessX`, 31s), linked against the arm64 `librln.so` + nat-libs.
 `ELF 64-bit LSB, ARM aarch64`. Exports the real node API — `logosdelivery_create_node / _start_node /
 _subscribe / _send / _set_event_callback / _stop_node / _destroy`, plus `waku_new`, `waku_relay_*`,
 `waku_filter_subscribe`. **First-ever Logos Messaging build for Android.**
