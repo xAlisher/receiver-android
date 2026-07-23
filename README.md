@@ -50,9 +50,10 @@ cd android && ./gradlew assembleRelease   # standalone release APK
 ```
 
 The Logos Messaging node (`liblogosdelivery.so`) is prebuilt and vendored in
-`android/app/src/main/jniLibs/arm64-v8a/`. To rebuild it from source — and for the full build story (the
-first Logos Messaging node compiled for Android) — see
-[`docs/logos-messaging-android-build.md`](docs/logos-messaging-android-build.md).
+`android/app/src/main/jniLibs/arm64-v8a/`. The node + JNI bridge + RN module now live as a standalone
+reusable library — [**logos-libdelivery-android**](https://github.com/xAlisher/logos-libdelivery-android)
+(prebuilts, from-source build script, CI). For the full build story (the first Logos Messaging node
+compiled for Android) see [`docs/logos-messaging-android-build.md`](docs/logos-messaging-android-build.md).
 
 ## Status
 
