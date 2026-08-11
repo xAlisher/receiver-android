@@ -1,5 +1,8 @@
 # Receiver (Android)
 
+> This is a personal, experimental hobby project. It is not an official Logos product. Not audited.
+
+
 **Decentralised, anonymous radio — on your phone.** Receiver discovers live radio stations over
 **Logos Messaging** (a peer-to-peer messaging network) and plays them through **Tor**, so the station's
 location and yours both stay private. Every station is cryptographically signed; forgeries are dropped.
